@@ -1,0 +1,203 @@
+
+<h2 class="sr-only">Interactive fractal treemap of geopolitical ideologies for all countries worldwide, grouped by regime type</h2>
+<div id="controls" style="display:flex;gap:12px;align-items:center;margin:0 0 12px;">
+  <button id="back" style="display:none;">Back</button>
+  <span id="breadcrumb" style="font-size:14px;color:var(--color-text-secondary);">All ideologies</span>
+</div>
+<div id="legend" style="display:flex;flex-wrap:wrap;gap:12px;margin:0 0 8px;font-size:12px;color:var(--color-text-secondary);"></div>
+<div id="map" style="width:100%;"></div>
+<div id="tooltip" style="position:absolute;pointer-events:none;background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 12px;font-size:13px;display:none;z-index:10;max-width:240px;color:var(--color-text-primary);"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const data={name:"World",children:[
+{name:"Full democracy",cat:"fd",children:[
+{name:"Northern Europe",children:[
+{name:"Norway",v:5},{name:"Finland",v:6},{name:"Sweden",v:10},{name:"Denmark",v:6},{name:"Iceland",v:0.4}]},
+{name:"Western Europe",children:[
+{name:"Netherlands",v:18},{name:"Luxembourg",v:0.7},{name:"Ireland",v:5},{name:"Switzerland",v:9},{name:"Austria",v:9}]},
+{name:"Southern Europe",children:[
+{name:"Spain",v:47},{name:"Portugal",v:10},{name:"Italy",v:59},{name:"Malta",v:0.5}]},
+{name:"Asia-Pacific",children:[
+{name:"New Zealand",v:5},{name:"Australia",v:26},{name:"Taiwan",v:24},{name:"South Korea",v:52},{name:"Japan",v:124}]},
+{name:"Americas",children:[
+{name:"Canada",v:39},{name:"Uruguay",v:4},{name:"Costa Rica",v:5},{name:"Chile",v:19}]},
+{name:"Other",children:[
+{name:"Germany",v:84},{name:"UK",v:67},{name:"France",v:68},{name:"Mauritius",v:1}]}
+]},
+{name:"Flawed democracy",cat:"fld",children:[
+{name:"Americas",children:[
+{name:"United States",v:333},{name:"Brazil",v:214},{name:"Argentina",v:46},{name:"Colombia",v:52},{name:"Peru",v:34},{name:"Ecuador",v:18},{name:"Panama",v:4},{name:"Jamaica",v:3},{name:"Dominican Rep.",v:11},{name:"Trinidad",v:1},{name:"Guyana",v:0.8},{name:"Suriname",v:0.6},{name:"Paraguay",v:7}]},
+{name:"Europe",children:[
+{name:"Poland",v:38},{name:"Romania",v:19},{name:"Greece",v:10},{name:"Hungary",v:10},{name:"Croatia",v:4},{name:"Bulgaria",v:7},{name:"Serbia",v:7},{name:"Czech Republic",v:11},{name:"Estonia",v:1},{name:"Latvia",v:2},{name:"Lithuania",v:3},{name:"Slovakia",v:5},{name:"Slovenia",v:2},{name:"Belgium",v:12},{name:"Cyprus",v:1},{name:"Moldova",v:3},{name:"North Macedonia",v:2},{name:"Montenegro",v:0.6},{name:"Albania",v:3},{name:"Bosnia",v:3}]},
+{name:"Asia",children:[
+{name:"India",v:1400},{name:"Indonesia",v:275},{name:"Philippines",v:113},{name:"Malaysia",v:33},{name:"Sri Lanka",v:22},{name:"Mongolia",v:3},{name:"Timor-Leste",v:1},{name:"Nepal",v:30}]},
+{name:"Africa",children:[
+{name:"South Africa",v:60},{name:"Ghana",v:33},{name:"Botswana",v:2},{name:"Namibia",v:3},{name:"Senegal",v:17},{name:"Benin",v:13},{name:"Lesotho",v:2},{name:"Tunisia",v:12},{name:"Zambia",v:20}]}
+]},
+{name:"Hybrid regime",cat:"hyb",children:[
+{name:"Eurasia",children:[
+{name:"Turkey",v:85},{name:"Ukraine",v:44},{name:"Georgia",v:4},{name:"Armenia",v:3},{name:"Kyrgyzstan",v:7}]},
+{name:"Asia",children:[
+{name:"Pakistan",v:230},{name:"Bangladesh",v:170},{name:"Thailand",v:72},{name:"Myanmar",v:55},{name:"Singapore",v:6},{name:"Bhutan",v:0.8}]},
+{name:"Americas",children:[
+{name:"Mexico",v:128},{name:"Guatemala",v:17},{name:"Honduras",v:10},{name:"Bolivia",v:12},{name:"El Salvador",v:6},{name:"Haiti",v:12}]},
+{name:"Africa",children:[
+{name:"Kenya",v:54},{name:"Nigeria",v:220},{name:"Tanzania",v:62},{name:"Uganda",v:47},{name:"Morocco",v:37},{name:"Mozambique",v:33},{name:"Madagascar",v:29},{name:"Ivory Coast",v:27},{name:"Niger",v:26},{name:"Mali",v:22},{name:"Burkina Faso",v:22},{name:"Malawi",v:20},{name:"Angola",v:35},{name:"Liberia",v:5},{name:"Sierra Leone",v:8},{name:"Mauritania",v:5},{name:"Gambia",v:3},{name:"Comoros",v:0.9}]},
+{name:"Middle East",children:[
+{name:"Iraq",v:42},{name:"Lebanon",v:5},{name:"Jordan",v:11},{name:"Palestine",v:5},{name:"Libya",v:7}]}
+]},
+{name:"Authoritarian",cat:"auth",children:[
+{name:"One-party states",children:[
+{name:"China",v:1400},{name:"Vietnam",v:100},{name:"Laos",v:7},{name:"Cuba",v:11},{name:"North Korea",v:26},{name:"Eritrea",v:4}]},
+{name:"Personalist / strongman",children:[
+{name:"Russia",v:144},{name:"Belarus",v:9},{name:"Venezuela",v:28},{name:"Nicaragua",v:7},{name:"Azerbaijan",v:10},{name:"Tajikistan",v:10},{name:"Turkmenistan",v:6},{name:"Uzbekistan",v:35},{name:"Kazakhstan",v:19},{name:"Cambodia",v:17},{name:"Syria",v:22},{name:"Zimbabwe",v:16},{name:"Cameroon",v:28},{name:"Chad",v:17},{name:"Rep. Congo",v:6},{name:"Eq. Guinea",v:2},{name:"Burundi",v:13},{name:"Rwanda",v:14},{name:"Togo",v:9},{name:"Guinea",v:14},{name:"DRC",v:100}]},
+{name:"Monarchies & theocracies",children:[
+{name:"Saudi Arabia",v:36},{name:"UAE",v:10},{name:"Qatar",v:3},{name:"Bahrain",v:2},{name:"Oman",v:4},{name:"Kuwait",v:4},{name:"Iran",v:88},{name:"Brunei",v:0.5},{name:"Eswatini",v:1}]},
+{name:"Military-influenced",children:[
+{name:"Egypt",v:104},{name:"Algeria",v:45},{name:"Sudan",v:47},{name:"Ethiopia",v:123},{name:"Afghanistan",v:41},{name:"Yemen",v:33},{name:"Somalia",v:17},{name:"South Sudan",v:11},{name:"Central African Rep.",v:5}]}
+]}
+]};
+
+const isDark=matchMedia('(prefers-color-scheme:dark)').matches;
+const colors={
+  fd:isDark?['#26215C','#3C3489','#534AB7','#7F77DD']:['#EEEDFE','#CECBF6','#AFA9EC','#7F77DD'],
+  fld:isDark?['#04342C','#085041','#0F6E56','#1D9E75']:['#E1F5EE','#9FE1CB','#5DCAA5','#1D9E75'],
+  hyb:isDark?['#412402','#633806','#854F0B','#BA7517']:['#FAEEDA','#FAC775','#EF9F27','#BA7517'],
+  auth:isDark?['#501313','#791F1F','#A32D2D','#E24B4A']:['#FCEBEB','#F7C1C1','#F09595','#E24B4A']
+};
+const catLabels={fd:'Full democracy',fld:'Flawed democracy',hyb:'Hybrid regime',auth:'Authoritarian'};
+const catTextColor={
+  fd:isDark?'#CECBF6':'#3C3489',
+  fld:isDark?'#9FE1CB':'#085041',
+  hyb:isDark?'#FAC775':'#633806',
+  auth:isDark?'#F7C1C1':'#791F1F'
+};
+const catStroke={
+  fd:isDark?'rgba(175,169,236,0.3)':'rgba(83,74,183,0.25)',
+  fld:isDark?'rgba(93,202,165,0.3)':'rgba(15,110,86,0.25)',
+  hyb:isDark?'rgba(250,199,117,0.3)':'rgba(133,79,11,0.25)',
+  auth:isDark?'rgba(240,149,149,0.3)':'rgba(163,45,45,0.25)'
+};
+
+const W=680,H=520;
+const svg=d3.select('#map').append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('width','100%');
+const tooltip=d3.select('#tooltip');
+
+function getCat(d){
+  let n=d;
+  while(n.parent){if(n.data.cat)return n.data.cat;n=n.parent;}
+  return 'fd';
+}
+
+function colorScale(cat,depth,i){
+  const c=colors[cat];
+  return c[Math.min(i%c.length,c.length-1)];
+}
+
+let currentRoot=null;
+
+function render(root){
+  currentRoot=root;
+  const hierarchy=d3.hierarchy(root).sum(d=>d.v||0).sort((a,b)=>b.value-a.value);
+  d3.treemap().size([W,H]).paddingOuter(3).paddingInner(2).round(true)(hierarchy);
+
+  svg.selectAll('*').remove();
+  const leaves=hierarchy.leaves();
+
+  const groups=svg.selectAll('g').data(leaves).join('g');
+
+  groups.append('rect')
+    .attr('x',d=>d.x0).attr('y',d=>d.y0)
+    .attr('width',d=>Math.max(0,d.x1-d.x0))
+    .attr('height',d=>Math.max(0,d.y1-d.y0))
+    .attr('rx',2)
+    .attr('fill',(d,i)=>{const cat=getCat(d);const c=colors[cat];return c[i%c.length];})
+    .attr('stroke',(d)=>catStroke[getCat(d)])
+    .attr('stroke-width',0.5)
+    .style('cursor','pointer')
+    .on('mousemove',function(ev,d){
+      const cat=getCat(d);
+      const path=[];let n=d;while(n.parent){path.unshift(n.data.name);n=n.parent;}
+      tooltip.style('display','block')
+        .style('left',(ev.offsetX+12)+'px')
+        .style('top',(ev.offsetY-10)+'px')
+        .html(`<div style="font-weight:500;margin-bottom:2px;">${d.data.name}</div><div style="font-size:12px;color:var(--color-text-secondary);">${catLabels[cat]} — Pop: ${d.data.v>=1?Math.round(d.data.v)+'M':'<1M'}</div><div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px;">${path.slice(0,-1).join(' → ')}</div>`);
+    })
+    .on('mouseleave',()=>tooltip.style('display','none'));
+
+  groups.each(function(d){
+    const w=d.x1-d.x0, h=d.y1-d.y0;
+    if(w>28&&h>14){
+      const cat=getCat(d);
+      const name=d.data.name;
+      const maxChars=Math.floor(w/6.5);
+      const label=name.length>maxChars?name.slice(0,maxChars-1)+'…':name;
+      const fs=w<50||h<22?9:w<80?10:11;
+      d3.select(this).append('text')
+        .attr('x',d.x0+4).attr('y',d.y0+fs+3)
+        .text(label)
+        .attr('font-size',fs+'px')
+        .attr('font-family','var(--font-sans)')
+        .attr('fill',catTextColor[cat])
+        .attr('pointer-events','none');
+    }
+  });
+
+  const bc=d3.select('#breadcrumb');
+  const backBtn=d3.select('#back');
+  if(root===data){
+    bc.text('All ideologies — sized by population');
+    backBtn.style('display','none');
+  } else {
+    const trail=[];let r=root;trail.push(r.name);
+    bc.text(trail.join(' → '));
+    backBtn.style('display','inline-block');
+  }
+}
+
+function buildLegend(){
+  const leg=d3.select('#legend');
+  Object.entries(catLabels).forEach(([k,label])=>{
+    const c=isDark?colors[k][2]:colors[k][1];
+    leg.append('span').style('display','flex').style('align-items','center').style('gap','4px')
+      .html(`<span style="width:10px;height:10px;border-radius:2px;background:${c};"></span>${label}`);
+  });
+}
+
+buildLegend();
+render(data);
+
+d3.select('#back').on('click',()=>render(data));
+
+svg.on('dblclick',function(ev){
+  const [mx,my]=[ev.offsetX*(W/svg.node().getBoundingClientRect().width),ev.offsetY*(H/svg.node().getBoundingClientRect().height)];
+  if(currentRoot===data){
+    const target=data.children.find(c=>{
+      const h=d3.hierarchy(c).sum(d=>d.v||0);
+      d3.treemap().size([W,H])(h);
+      return true;
+    });
+    for(const child of data.children){
+      const h=d3.hierarchy(child).sum(d=>d.v||0).sort((a,b)=>b.value-a.value);
+      d3.treemap().size([W,H]).paddingOuter(3).paddingInner(2).round(true)(h);
+      const hit=h.leaves().find(l=>mx>=l.x0&&mx<=l.x1&&my>=l.y0&&my<=l.y1);
+      if(hit){render(child);break;}
+    }
+  }
+});
+
+svg.on('click',function(ev){
+  if(currentRoot!==data)return;
+  const rect=svg.node().getBoundingClientRect();
+  const mx=ev.offsetX*(W/rect.width),my=ev.offsetY*(H/rect.height);
+  const hierarchy=d3.hierarchy(data).sum(d=>d.v||0).sort((a,b)=>b.value-a.value);
+  d3.treemap().size([W,H]).paddingOuter(3).paddingInner(2).round(true)(hierarchy);
+  const hit=hierarchy.leaves().find(l=>mx>=l.x0&&mx<=l.x1&&my>=l.y0&&my<=l.y1);
+  if(hit){
+    let n=hit;
+    while(n.parent&&n.parent.parent)n=n.parent;
+    const catNode=data.children.find(c=>c.name===n.data.name);
+    if(catNode)render(catNode);
+  }
+});
+</script>

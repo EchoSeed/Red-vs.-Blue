@@ -1,0 +1,287 @@
+
+<h2 class="sr-only">Interactive global vote simulation of the red button / blue button survival dilemma, showing predicted votes per country</h2>
+<style>
+#outcome-bar{height:32px;border-radius:var(--border-radius-md);overflow:hidden;display:flex;position:relative;margin:8px 0 4px}
+#outcome-bar div{transition:width 0.4s}
+.stat-row{display:flex;gap:12px;margin:0 0 12px;flex-wrap:wrap}
+.stat-box{flex:1;min-width:140px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 14px}
+.stat-label{font-size:12px;color:var(--color-text-secondary);margin:0 0 2px}
+.stat-val{font-size:20px;font-weight:500}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;align-items:center}
+.filter-row label{font-size:13px;color:var(--color-text-secondary)}
+.filter-row select{font-size:13px;padding:4px 8px;background:var(--color-background-primary);color:var(--color-text-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md)}
+#treemap-wrap{width:100%;position:relative}
+#tt{position:absolute;pointer-events:none;background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 12px;font-size:13px;display:none;z-index:10;max-width:280px;color:var(--color-text-primary)}
+</style>
+
+<div class="stat-row">
+  <div class="stat-box"><div class="stat-label">Global blue votes</div><div class="stat-val" id="s-blue" style="color:#378ADD">—</div></div>
+  <div class="stat-box"><div class="stat-label">Global red votes</div><div class="stat-val" id="s-red" style="color:#E24B4A">—</div></div>
+  <div class="stat-box"><div class="stat-label">Outcome</div><div class="stat-val" id="s-outcome" style="font-size:15px">—</div></div>
+</div>
+<div id="outcome-bar"></div>
+<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-text-tertiary);margin:0 0 14px"><span>Blue (cooperate)</span><span>50% threshold</span><span>Red (defect)</span></div>
+
+<div class="filter-row">
+  <label>View:</label>
+  <select id="filterCat"><option value="all">All countries</option><option value="fd">Full democracies</option><option value="fld">Flawed democracies</option><option value="hyb">Hybrid regimes</option><option value="auth">Authoritarian</option></select>
+  <label>Sort by:</label>
+  <select id="sortBy"><option value="pop">Population</option><option value="blue">Most blue</option><option value="red">Most red</option></select>
+</div>
+<div id="treemap-wrap"><div id="tt"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+const isDk=matchMedia('(prefers-color-scheme:dark)').matches;
+
+const countries=[
+{n:"Norway",pop:5.4,blue:78,cat:"fd",r:"High social trust, collectivist safety net, strong civic duty culture"},
+{n:"Finland",pop:5.5,blue:76,cat:"fd",r:"Highest institutional trust globally, communal resilience ethos"},
+{n:"Sweden",pop:10.4,blue:74,cat:"fd",r:"Deep social contract tradition, but individualism rising"},
+{n:"Denmark",pop:5.8,blue:77,cat:"fd",r:"World's highest social trust, strong 'we' orientation"},
+{n:"Iceland",pop:0.38,blue:79,cat:"fd",r:"Tiny close-knit society, extreme communal bonds"},
+{n:"Netherlands",pop:17.5,blue:68,cat:"fd",r:"Pragmatic cooperators, polder model consensus culture"},
+{n:"Switzerland",pop:8.8,blue:65,cat:"fd",r:"Direct democracy tradition but strong self-reliance streak"},
+{n:"Ireland",pop:5.1,blue:67,cat:"fd",r:"Community bonds strong, Catholic moral framework lingers"},
+{n:"Luxembourg",pop:0.65,blue:66,cat:"fd",r:"Small wealthy community, high trust"},
+{n:"Austria",pop:9.1,blue:63,cat:"fd",r:"Moderate trust, communal Alpine traditions"},
+{n:"Germany",pop:84,blue:62,cat:"fd",r:"Orderly cooperators but deeply rational — many would calculate red is dominant"},
+{n:"UK",pop:67,blue:48,cat:"fd",r:"Individualist culture, game-theory-literate, Brexit showed trust fractures"},
+{n:"France",pop:68,blue:46,cat:"fd",r:"Revolutionary individualism, distrust of collective mandates"},
+{n:"Spain",pop:47,blue:55,cat:"fd",r:"Strong family/community bonds, but economic anxiety pushes self-preservation"},
+{n:"Portugal",pop:10.3,blue:58,cat:"fd",r:"Communal saudade culture, relatively high social cohesion"},
+{n:"Italy",pop:59,blue:44,cat:"fd",r:"Family loyalty intense but institutional trust among lowest in Europe"},
+{n:"Malta",pop:0.52,blue:60,cat:"fd",r:"Tiny island community, Catholic moral weight"},
+{n:"Japan",pop:124,blue:72,cat:"fd",r:"Extreme collectivism, social harmony (wa) deeply embedded, self-sacrifice normalized"},
+{n:"South Korea",pop:52,blue:61,cat:"fd",r:"Confucian collectivism strong, but intense competition culture creates hedgers"},
+{n:"Taiwan",pop:24,blue:66,cat:"fd",r:"Civic solidarity from shared threat, strong democratic identity"},
+{n:"Australia",pop:26,blue:49,cat:"fd",r:"Mateship culture but individualist core, 'fair go' ethos tested under pressure"},
+{n:"New Zealand",pop:5.1,blue:71,cat:"fd",r:"Small cohesive society, strong communal response culture (post-Christchurch)"},
+{n:"Canada",pop:39,blue:56,cat:"fd",r:"Multicultural cooperative ethos, but pragmatic streak"},
+{n:"Uruguay",pop:3.5,blue:60,cat:"fd",r:"Strong social democratic tradition, small cohesive population"},
+{n:"Costa Rica",pop:5.2,blue:62,cat:"fd",r:"Pura vida collectivism, no military — peace-oriented culture"},
+{n:"Chile",pop:19.5,blue:51,cat:"fd",r:"Individualist by Latin American standards, neoliberal legacy"},
+{n:"Mauritius",pop:1.3,blue:58,cat:"fd",r:"Small diverse island, strong communal bonds"},
+{n:"United States",pop:333,blue:38,cat:"fld",r:"Hyper-individualist, game-theory-literate, 'rational self-interest' culturally celebrated. Many would recognize red as dominant strategy."},
+{n:"Brazil",pop:214,blue:47,cat:"fld",r:"Jeitinho (finding your own way) culture, community warmth vs survival pragmatism"},
+{n:"Argentina",pop:46,blue:45,cat:"fld",r:"Crisis-hardened pragmatism, 'trust yourself first' after repeated institutional failures"},
+{n:"Colombia",pop:52,blue:44,cat:"fld",r:"Conflict-shaped survival instincts, but strong community resilience"},
+{n:"Peru",pop:34,blue:43,cat:"fld",r:"Low institutional trust, indigenous communal traditions vs urban individualism"},
+{n:"India",pop:1400,blue:52,cat:"fld",r:"Massive diversity — dharmic duty and collectivism vs caste competition and survival scarcity. Slight blue edge from communal moral frameworks."},
+{n:"Indonesia",pop:275,blue:56,cat:"fld",r:"Gotong royong (mutual aid) deeply embedded, Islamic communal obligation"},
+{n:"Philippines",pop:113,blue:54,cat:"fld",r:"Bayanihan (communal help) culture, strong family/community bonds"},
+{n:"Malaysia",pop:33,blue:53,cat:"fld",r:"Multi-ethnic communalism, Islamic social obligation"},
+{n:"South Africa",pop:60,blue:42,cat:"fld",r:"Ubuntu philosophy vs extreme inequality and survival pressure"},
+{n:"Ghana",pop:33,blue:55,cat:"fld",r:"Strong communal traditions, relatively high social trust for region"},
+{n:"Poland",pop:38,blue:47,cat:"fld",r:"Catholic solidarity vs post-communist distrust of collective mandates"},
+{n:"Romania",pop:19,blue:40,cat:"fld",r:"Deep institutional distrust from communist era, self-reliance ethos"},
+{n:"Greece",pop:10.4,blue:42,cat:"fld",r:"Austerity-shattered trust, philotimo (honor) culture pulls both ways"},
+{n:"Hungary",pop:10,blue:39,cat:"fld",r:"Nationalist self-preservation narrative dominant"},
+{n:"Czech Republic",pop:10.8,blue:45,cat:"fld",r:"Pragmatic, secular, moderate trust"},
+{n:"Serbia",pop:6.7,blue:36,cat:"fld",r:"War-shaped survival mentality, low institutional trust"},
+{n:"Sri Lanka",pop:22,blue:48,cat:"fld",r:"Buddhist compassion vs ethnic conflict survival instincts"},
+{n:"Mongolia",pop:3.4,blue:52,cat:"fld",r:"Nomadic communal traditions persist"},
+{n:"Nepal",pop:30,blue:53,cat:"fld",r:"Buddhist/Hindu moral frameworks, communal mountain culture"},
+{n:"Senegal",pop:17,blue:55,cat:"fld",r:"Teranga (hospitality) culture, strong Islamic communal bonds"},
+{n:"Botswana",pop:2.4,blue:57,cat:"fld",r:"Kgotla consensus tradition, highest-trust African state"},
+{n:"Dominican Rep.",pop:11,blue:44,cat:"fld",r:"Survival pragmatism, moderate community bonds"},
+{n:"Ecuador",pop:18,blue:45,cat:"fld",r:"Indigenous communal traditions vs urban individualism"},
+{n:"Paraguay",pop:7.2,blue:46,cat:"fld",r:"Strong Guarani communal culture"},
+{n:"Tunisia",pop:12,blue:43,cat:"fld",r:"Post-revolution hope fading, pragmatic hedging"},
+{n:"Zambia",pop:20,blue:50,cat:"fld",r:"Ubuntu traditions, moderate communal bonds"},
+{n:"Benin",pop:13,blue:49,cat:"fld",r:"Communal traditions, moderate trust"},
+{n:"Turkey",pop:85,blue:38,cat:"hyb",r:"Polarized society, survival-oriented, trust eroded by political instability"},
+{n:"Mexico",pop:128,blue:42,cat:"hyb",r:"Strong family/community bonds but deep institutional distrust, narco-era survival calculus"},
+{n:"Pakistan",pop:230,blue:45,cat:"hyb",r:"Islamic ummah collectivism vs tribal/clan self-preservation"},
+{n:"Bangladesh",pop:170,blue:50,cat:"hyb",r:"Dense communal living, Islamic obligation, but extreme survival pressure"},
+{n:"Nigeria",pop:220,blue:39,cat:"hyb",r:"Ethnic/religious fragmentation, 'every man for himself' survival culture dominant"},
+{n:"Thailand",pop:72,blue:55,cat:"hyb",r:"Buddhist merit-making, communal village culture, kreng jai (consideration)"},
+{n:"Kenya",pop:54,blue:42,cat:"hyb",r:"Harambee (pulling together) tradition vs ethnic competition"},
+{n:"Ukraine",pop:44,blue:58,cat:"hyb",r:"War-forged solidarity, collective survival identity sharpened since 2022"},
+{n:"Myanmar",pop:55,blue:44,cat:"hyb",r:"Buddhist compassion vs military-era survival instincts"},
+{n:"Tanzania",pop:62,blue:48,cat:"hyb",r:"Ujamaa (familyhood) legacy, moderate communal bonds"},
+{n:"Uganda",pop:47,blue:44,cat:"hyb",r:"Communal traditions but survival pragmatism"},
+{n:"Morocco",pop:37,blue:46,cat:"hyb",r:"Islamic communal duty, monarchical stability provides some trust"},
+{n:"Angola",pop:35,blue:35,cat:"hyb",r:"War-scarred, resource-curse distrust, survival-first"},
+{n:"Iraq",pop:42,blue:33,cat:"hyb",r:"Decades of conflict destroyed cooperative trust, sectarian survival calculus"},
+{n:"Georgia",pop:3.7,blue:50,cat:"hyb",r:"Small nation solidarity, but political polarization"},
+{n:"Singapore",pop:5.9,blue:60,cat:"hyb",r:"Hyper-rational but deeply communitarian policy culture, Confucian duty"},
+{n:"Bolivia",pop:12,blue:50,cat:"hyb",r:"Indigenous ayllu communal traditions strong"},
+{n:"Guatemala",pop:17,blue:40,cat:"hyb",r:"Low trust, survival-oriented after civil war"},
+{n:"Honduras",pop:10,blue:38,cat:"hyb",r:"Gang-era survival mentality, low institutional trust"},
+{n:"El Salvador",pop:6.3,blue:40,cat:"hyb",r:"Authoritarian stability increasing trust, but hedging instinct strong"},
+{n:"Haiti",pop:12,blue:35,cat:"hyb",r:"State collapse, pure survival mode for most"},
+{n:"Mali",pop:22,blue:42,cat:"hyb",r:"Strong communal Malian culture vs conflict instability"},
+{n:"Burkina Faso",pop:22,blue:43,cat:"hyb",r:"Communal Sahel traditions"},
+{n:"Niger",pop:26,blue:44,cat:"hyb",r:"Islamic communal bonds, Sahel solidarity"},
+{n:"Madagascar",pop:29,blue:46,cat:"hyb",r:"Fihavanana (kinship) culture, communal"},
+{n:"Mozambique",pop:33,blue:40,cat:"hyb",r:"Post-conflict, moderate communal bonds"},
+{n:"Ivory Coast",pop:27,blue:43,cat:"hyb",r:"Post-conflict recovery, moderate communalism"},
+{n:"Malawi",pop:20,blue:48,cat:"hyb",r:"Warm Heart of Africa — strong communal identity"},
+{n:"Lebanon",pop:5.5,blue:32,cat:"hyb",r:"Sectarian fragmentation, 'protect your own' dominant"},
+{n:"Jordan",pop:11,blue:42,cat:"hyb",r:"Tribal loyalty structures, moderate trust within groups"},
+{n:"Libya",pop:7,blue:28,cat:"hyb",r:"State collapse, tribal survival logic"},
+{n:"Armenia",pop:3,blue:52,cat:"hyb",r:"Genocide-forged collective identity, diaspora solidarity"},
+{n:"Kyrgyzstan",pop:6.8,blue:45,cat:"hyb",r:"Nomadic communal traditions, moderate trust"},
+{n:"Liberia",pop:5.2,blue:40,cat:"hyb",r:"Post-war recovery, fragile communalism"},
+{n:"Sierra Leone",pop:8.4,blue:42,cat:"hyb",r:"Post-conflict communal rebuilding"},
+{n:"China",pop:1400,blue:58,cat:"auth",r:"Extreme collectivism, Confucian duty to the group, social harmony valued over individual gain. State-directed cooperation likely."},
+{n:"Russia",pop:144,blue:29,cat:"auth",r:"Deeply cynical, zero-trust society. 'If you don't look out for yourself, nobody will.' Red is obvious."},
+{n:"Iran",pop:88,blue:40,cat:"auth",r:"Shia communal bonds and martyrdom culture vs deep state distrust"},
+{n:"Egypt",pop:104,blue:41,cat:"auth",r:"Islamic communal obligation vs authoritarian-era every-man-for-himself"},
+{n:"Ethiopia",pop:123,blue:43,cat:"auth",r:"Ancient communal traditions vs ethnic conflict survival pressure"},
+{n:"Vietnam",pop:100,blue:62,cat:"auth",r:"Confucian collectivism, war-forged communal solidarity, high social cohesion"},
+{n:"Saudi Arabia",pop:36,blue:44,cat:"auth",r:"Islamic ummah duty, tribal loyalty, but wealth enables hedging"},
+{n:"Algeria",pop:45,blue:37,cat:"auth",r:"Post-independence distrust, decade noir survival mentality"},
+{n:"Sudan",pop:47,blue:30,cat:"auth",r:"Active conflict, tribal survival logic dominant"},
+{n:"Afghanistan",pop:41,blue:28,cat:"auth",r:"Decades of war, extreme survival orientation, trust only within clan"},
+{n:"Yemen",pop:33,blue:27,cat:"auth",r:"Active war, pure survival calculus"},
+{n:"North Korea",pop:26,blue:65,cat:"auth",r:"Paradoxically high — total state control means the state decides what button people press. Directed cooperation."},
+{n:"Venezuela",pop:28,blue:36,cat:"auth",r:"Crisis survival mode, institutional trust destroyed"},
+{n:"Cuba",pop:11,blue:55,cat:"auth",r:"Revolutionary collectivism still strong, small communal island"},
+{n:"Rwanda",pop:14,blue:56,cat:"auth",r:"Post-genocide 'never again' collective identity, strong state-directed cohesion"},
+{n:"UAE",pop:10,blue:45,cat:"auth",r:"Wealthy, state-managed, moderate communal bonds"},
+{n:"Uzbekistan",pop:35,blue:42,cat:"auth",r:"Mahalla communal traditions, moderate collectivism"},
+{n:"Kazakhstan",pop:19,blue:40,cat:"auth",r:"Post-Soviet pragmatism, moderate communal bonds"},
+{n:"Cambodia",pop:17,blue:50,cat:"auth",r:"Buddhist communalism, Khmer Rouge memory creates communal caution"},
+{n:"Belarus",pop:9.4,blue:34,cat:"auth",r:"Soviet-era cynicism, authoritarian distrust"},
+{n:"Azerbaijan",pop:10,blue:36,cat:"auth",r:"Post-Soviet distrust, clan-based loyalty"},
+{n:"DRC",pop:100,blue:34,cat:"auth",r:"State failure, conflict zones, survival-first across vast territory"},
+{n:"Somalia",pop:17,blue:25,cat:"auth",r:"Stateless, clan warfare, extreme survival orientation — lowest trust"},
+{n:"Syria",pop:22,blue:29,cat:"auth",r:"Civil war destruction of social fabric, sectarian survival"},
+{n:"Zimbabwe",pop:16,blue:38,cat:"auth",r:"Economic collapse survival mentality, moderate communal bonds"},
+{n:"Cameroon",pop:28,blue:40,cat:"auth",r:"Moderate communal traditions vs political instability"},
+{n:"Chad",pop:17,blue:35,cat:"auth",r:"Conflict, low trust, survival-oriented"},
+{n:"South Sudan",pop:11,blue:26,cat:"auth",r:"Newest state, civil war, extreme survival calculus"},
+{n:"Eritrea",pop:3.6,blue:48,cat:"auth",r:"Tiny, isolated, war-forged collective identity"},
+{n:"Laos",pop:7.4,blue:56,cat:"auth",r:"Buddhist communalism, small-scale village cooperation"},
+{n:"Nicaragua",pop:6.8,blue:40,cat:"auth",r:"Revolutionary legacy fading, authoritarian distrust"},
+{n:"Turkmenistan",pop:6.2,blue:38,cat:"auth",r:"Extreme state control, tribal bonds, low general trust"},
+{n:"Tajikistan",pop:10,blue:42,cat:"auth",r:"Communal traditions, moderate Islamic solidarity"},
+{n:"Qatar",pop:2.9,blue:46,cat:"auth",r:"Wealthy, small, state-managed communalism"},
+{n:"Bahrain",pop:1.5,blue:40,cat:"auth",r:"Sectarian tensions, hedging instinct"},
+{n:"Oman",pop:4.5,blue:48,cat:"auth",r:"Relatively cohesive, Ibadi moderation"},
+{n:"Kuwait",pop:4.3,blue:44,cat:"auth",r:"Diwaniya communal culture, moderate trust"},
+{n:"Brunei",pop:0.45,blue:52,cat:"auth",r:"Tiny wealthy monarchy, high cohesion"},
+{n:"Eswatini",pop:1.2,blue:45,cat:"auth",r:"Small kingdom, communal traditions"},
+{n:"Guinea",pop:14,blue:40,cat:"auth",r:"Communal traditions vs political instability"},
+{n:"Burundi",pop:13,blue:37,cat:"auth",r:"Ethnic conflict history, survival-oriented"},
+{n:"Togo",pop:8.8,blue:42,cat:"auth",r:"Moderate communal bonds"},
+{n:"Central African Rep.",pop:5.4,blue:30,cat:"auth",r:"Active conflict, state failure, survival mode"},
+{n:"Eq. Guinea",pop:1.6,blue:38,cat:"auth",r:"Small, resource-rich, authoritarian distrust"},
+{n:"Rep. Congo",pop:5.8,blue:39,cat:"auth",r:"Resource-curse dynamics, moderate communalism"}
+];
+
+const catNames={fd:"Full democracy",fld:"Flawed democracy",hyb:"Hybrid regime",auth:"Authoritarian"};
+const W=680,H=540;
+
+function computeGlobal(list){
+  let totalPop=0,totalBlue=0;
+  list.forEach(c=>{totalPop+=c.pop;totalBlue+=c.pop*(c.blue/100);});
+  return {totalPop,totalBlue,totalRed:totalPop-totalBlue,pctBlue:totalBlue/totalPop*100};
+}
+
+function updateStats(list){
+  const g=computeGlobal(list);
+  document.getElementById('s-blue').textContent=Math.round(g.pctBlue)+'%';
+  document.getElementById('s-red').textContent=Math.round(100-g.pctBlue)+'%';
+  const bar=document.getElementById('outcome-bar');
+  const bPct=g.pctBlue;
+  bar.innerHTML=`<div style="width:${bPct}%;background:#378ADD"></div><div style="width:${100-bPct}%;background:#E24B4A"></div><div style="position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--color-text-primary);opacity:0.5"></div>`;
+  const el=document.getElementById('s-outcome');
+  if(bPct>=50){
+    el.textContent='Everyone survives';
+    el.style.color='#378ADD';
+  } else {
+    el.textContent='Red voters survive ('+Math.round(g.totalRed*1000000).toLocaleString()+')';
+    el.style.color='#E24B4A';
+  }
+}
+
+function renderTreemap(filter,sort){
+  const list=filter==='all'?countries:countries.filter(c=>c.cat===filter);
+  const sorted=[...list];
+  if(sort==='blue')sorted.sort((a,b)=>b.blue-a.blue);
+  else if(sort==='red')sorted.sort((a,b)=>a.blue-b.blue);
+  else sorted.sort((a,b)=>b.pop-a.pop);
+
+  updateStats(list);
+
+  const root={name:"root",children:sorted.map(c=>({name:c.n,value:c.pop,blue:c.blue,cat:c.cat,reason:c.r}))};
+  const hierarchy=d3.hierarchy(root).sum(d=>d.value||0);
+  if(sort==='pop')hierarchy.sort((a,b)=>b.value-a.value);
+  d3.treemap().size([W,H]).paddingOuter(2).paddingInner(1.5).round(true)(hierarchy);
+
+  const wrap=document.getElementById('treemap-wrap');
+  const existing=wrap.querySelector('svg');
+  if(existing)existing.remove();
+
+  const svg=d3.select('#treemap-wrap').append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('width','100%');
+  const tt=d3.select('#tt');
+  const leaves=hierarchy.leaves();
+
+  const groups=svg.selectAll('g').data(leaves).join('g');
+
+  groups.append('rect')
+    .attr('x',d=>d.x0).attr('y',d=>d.y0)
+    .attr('width',d=>Math.max(0,d.x1-d.x0))
+    .attr('height',d=>Math.max(0,d.y1-d.y0))
+    .attr('rx',2)
+    .attr('fill',d=>{
+      const b=d.data.blue/100;
+      const r=Math.round(55+(1-b)*171);
+      const g=Math.round(138*b+75*(1-b));
+      const bl=Math.round(221*b+74*(1-b));
+      return isDk?`rgb(${Math.round(r*0.55)},${Math.round(g*0.55)},${Math.round(bl*0.55)})`:`rgb(${r},${g},${bl})`;
+    })
+    .attr('stroke',isDk?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)')
+    .attr('stroke-width',0.5)
+    .style('cursor','pointer')
+    .on('mousemove',function(ev,d){
+      const rect=wrap.getBoundingClientRect();
+      tt.style('display','block')
+        .style('left',Math.min(ev.offsetX+12,W-200)+'px')
+        .style('top',(ev.offsetY-10)+'px')
+        .html(`<div style="font-weight:500;margin-bottom:3px">${d.data.name}</div>
+<div style="display:flex;gap:12px;font-size:12px;margin-bottom:4px">
+<span style="color:#378ADD">${d.data.blue}% blue</span>
+<span style="color:#E24B4A">${100-d.data.blue}% red</span>
+<span style="color:var(--color-text-tertiary)">${d.data.value>=1?Math.round(d.data.value)+'M':'<1M'} pop</span>
+</div>
+<div style="font-size:12px;color:var(--color-text-secondary);line-height:1.4">${d.data.reason}</div>
+<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:3px">${catNames[d.data.cat]}</div>`);
+    })
+    .on('mouseleave',()=>tt.style('display','none'));
+
+  groups.each(function(d){
+    const w=d.x1-d.x0,h=d.y1-d.y0;
+    if(w>24&&h>14){
+      const maxC=Math.floor(w/5.8);
+      const nm=d.data.name;
+      const label=nm.length>maxC?nm.slice(0,maxC-1)+'…':nm;
+      const fs=w<50||h<20?8:w<80?9:w<110?10:11;
+      const bright=d.data.blue>55;
+      d3.select(this).append('text')
+        .attr('x',d.x0+3).attr('y',d.y0+fs+2)
+        .text(label)
+        .attr('font-size',fs+'px')
+        .attr('font-family','var(--font-sans)')
+        .attr('fill',isDk?(bright?'rgba(200,220,255,0.9)':'rgba(255,200,200,0.9)'):(bright?'#042C53':'#501313'))
+        .attr('pointer-events','none');
+      if(w>44&&h>28){
+        d3.select(this).append('text')
+          .attr('x',d.x0+3).attr('y',d.y0+fs+13)
+          .text(d.data.blue+'%')
+          .attr('font-size',(fs-1)+'px')
+          .attr('font-family','var(--font-sans)')
+          .attr('fill',isDk?'rgba(255,255,255,0.5)':'rgba(0,0,0,0.4)')
+          .attr('pointer-events','none');
+      }
+    }
+  });
+}
+
+renderTreemap('all','pop');
+document.getElementById('filterCat').addEventListener('change',e=>renderTreemap(e.target.value,document.getElementById('sortBy').value));
+document.getElementById('sortBy').addEventListener('change',e=>renderTreemap(document.getElementById('filterCat').value,e.target.value));
+</script>
